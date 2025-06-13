@@ -1,0 +1,661 @@
+<html>
+<style>body { background-color: #000000; font-family: Arial; Color: white;}</style>
+<head>
+	<!-- Global site tag (gtag.js) - Google Analytics -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=UA-130701452-1"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'UA-130701452-1');
+</script>
+
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta charset="utf-8">
+<meta name="theme-color" content="#031b26" />
+
+<meta name="description" content="This page shows temperature in Berezan' town, Kiev region">
+<meta name="keywords" content="temperature , Berezan'">
+<meta name="author" content="Serhii Bazavluk">
+
+	<link rel="shortcut icon" type="image/png" href="https://www.highcharts.com/images/ico/favicon-16x16.png"/>
+	<link rel="shortcut icon" type="image/png" href="https://www.highcharts.com/images/ico/favicon-96x96.png"/>
+	<link rel="shortcut icon" type="image/png" href="https://www.highcharts.com/images/ico/favicon-32x32.png"/>
+	<link rel="shortcut icon" type="image/png" href="https://www.highcharts.com/images/ico/favicon-160x160.png"/>
+	<link rel="shortcut icon" type="image/png" href="https://www.highcharts.com/images/ico/favicon-192x192.png"/>
+
+<title>EDO UNIVERSITY-EMS'</title>
+    </head>
+
+<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+
+<script>
+
+	var lastUpdtTime;
+	var d;
+	var alertDone = false;
+	
+	var lowestTemp;
+	var highestTemp;
+	var lowestTempTime;
+	var highestTempTime;
+
+	var lowestpressure;
+	var highestpressure;
+	var lowestpressureTime;
+	var highestpressureTime;
+
+	var lowestWindSpeed;
+	var highestWindSpeed;
+	var lowestWindSpeedTime;
+	var highestWindSpeedTime;
+
+	var timeCorection=0;
+
+	var refreshIntervalId;
+
+	var options = { 
+  year: 'numeric',
+  month: 'long',
+  day: 'numeric',
+  timezone: 'UTC',
+  hour: 'numeric',
+  minute: 'numeric',
+  second: 'numeric'
+};
+
+function secondsToHms(d) {
+    d = Number(d);
+    var h = Math.floor(d / 3600);
+    var m = Math.floor(d % 3600 / 60);
+    var s = Math.floor(d % 3600 % 60);
+
+    var hDisplay = h + " hrs. ";
+    var mDisplay = m + " min. ";
+    var sDisplay = s + " sec.";
+    return hDisplay + mDisplay + sDisplay; 
+}
+
+
+$(document).ready(function() {
+
+	var randomPic = Math.floor(Math.random() * 5);
+
+	var imageUrl;
+
+	if(randomPic==0){ imageUrl = "https://dl.dropboxusercontent.com/s/617diqol9mnutmm/backWeatherDark.jpg" ;}
+	if(randomPic==1){ imageUrl = "https://dl.dropboxusercontent.com/s/l1nsxpf8kehyvh0/backWeatherDark1.jpg" ;} 
+	if(randomPic==2){ imageUrl = "https://dl.dropboxusercontent.com/s/gcjotfzusrdf7eg/backWeatherDark2.jpg" ;} 
+	if(randomPic==3){ imageUrl = "https://dl.dropboxusercontent.com/s/9dxie7a6v5ti4yk/backWeatherDark3.jpg" ;}
+	if(randomPic==4){ imageUrl = "https://dl.dropboxusercontent.com/s/lqsy6fbbmsfusgu/backWeatherDark4.jpg" ;}
+
+	console.log("Pic N: " + randomPic);
+
+	$('.background-image').css('background-image', 'url("' + imageUrl + '")');
+
+
+	 // don't cache
+	 $.ajaxSetup({ cache: false });
+
+
+	getUpdates();
+	// check for new updates
+	refreshIntervalId = setInterval('getUpdates()',15000);
+
+	setInterval('liveTimerUpdtFun()',1000);
+
+	loadAdditionalStuff();
+
+	//$.get('http://logurl.com/pageMetrics');
+});
+
+function loadAdditionalStuff() {
+    // timeCorection
+    $.getJSON('https://worldclockapi.com/api/json/utc/now', function(data) { // Changed to HTTPS
+        var nowFromServr = new Date(data.currentFileTime/ 10000 - 11644473600000);
+        timeCorection = nowFromServr - new Date().getTime();
+        timeCorection = timeCorection + 200;
+        console.log("timeCorectionValue: " + timeCorection);
+    });
+
+    // CORRECTED: Fetch all necessary fields (1,2,4) for 24-hour data
+    $.getJSON('https://api.thingspeak.com/channels/2978677/feeds.json?days=1&results=8000&fields=field1,field2,field4', function(data) {
+        $.each(data.feeds, function(index,item) {
+            // Temperature processing (field1)
+            if (item.field1 !== null) {
+                var temp = parseFloat(item.field1);
+                if (lowestTemp == null || temp < lowestTemp) {
+                    lowestTemp = temp;
+                    lowestTempTime = new Date(item.created_at);
+                }
+                if (highestTemp == null || temp > highestTemp) {
+                    highestTemp = temp;
+                    highestTempTime = new Date(item.created_at);
+                }
+            }
+
+            // ADDED: Pressure processing (field2)
+            if (item.field2 !== null) {
+                var pressure = parseFloat(item.field2);
+                if (lowestpressure == null || pressure < lowestpressure) {
+                    lowestpressure = pressure;
+                    lowestpressureTime = new Date(item.created_at);
+                }
+                if (highestpressure == null || pressure > highestpressure) {
+                    highestpressure = pressure;
+                    highestpressureTime = new Date(item.created_at);
+                }
+            }
+
+            // ADDED: Wind Speed processing (field4)
+            if (item.field4 !== null) {
+                var windSpeed = parseFloat(item.field4);
+                if (lowestWindSpeed == null || windSpeed < lowestWindSpeed) {
+                    lowestWindSpeed = windSpeed;
+                    lowestWindSpeedTime = new Date(item.created_at);
+                }
+                if (highestWindSpeed == null || windSpeed > highestWindSpeed) {
+                    highestWindSpeed = windSpeed;
+                    highestWindSpeedTime = new Date(item.created_at);
+                }
+            }
+        });
+    });
+
+    // Existing sunset/sunrise code remains the same
+    $.getJSON('https://api.sunrise-sunset.org/json?lat=7.135187&lng=6.310025&formatted=0', function(data) {
+        if(data.status=="OK"){
+            // ... existing sunset/sunrise code ...
+        }
+    });
+}
+
+
+function getUpdates() {
+	// get the data with a webservice call
+	$("#entry_id").css('color', '#f44b4b');
+
+	$.getJSON('https://api.thingspeak.com/channels/2978677/feeds/last', function(data) {
+
+			// if the field1 has data update the page
+
+			d = new Date(data.created_at);
+
+
+
+	$("#created_at").html(d.toLocaleString("en-GB", options)).css("fontSize", 15);
+	$("#entry_id").html(data.entry_id).css("fontSize", 15);
+
+	if (data.field1!=null){
+     $("#field1").html(data.field1).css("fontSize", 15);
+	}
+	else{
+	$("#field1").html("OFFLINE").css("fontSize", 15);	
+	}
+
+	if (data.field2!=null){
+	$("#field2").html(data.field2).css("fontSize", 15);
+	}
+	else{
+    $("#field2").html("OFFLINE").css("fontSize", 15);
+	}
+
+	if (data.field3!=null){
+	$("#field3").html(data.field3).css("fontSize", 15);
+	}
+	else{
+    $("#field3").html("OFFLINE").css("fontSize", 15);
+	}
+
+	if (data.field4!=null){
+	$("#field4").html(data.field4).css("fontSize", 15);
+	}
+	else{
+    $("#field4").html("OFFLINE").css("fontSize", 15);
+	}
+	
+	$("#entry_id").css('color', 'white');
+
+	    // add color if success
+	$("#field1").css('color', '#40ef8c');
+	$("#field2").css('color', '#40ef8c');
+	$("#field3").css('color', '#40ef8c');
+	$("#field4").css('color', '#40ef8c');
+	$("#field1").css("fontSize", 20);
+	$("#field2").css("fontSize", 20);
+	$("#field3").css("fontSize", 20);
+	$("#field4").css("fontSize", 20);
+
+
+	// update highLow with the last value
+    if(highestTemp!=null && lowestTemp!=null){
+	if (parseFloat(data.field1)>=highestTemp){
+		highestTemp=parseFloat(data.field1);
+		highestTempTime = new Date(data.created_at);
+		}
+	if (parseFloat(data.field1)<=lowestTemp){
+		lowestTemp=parseFloat(data.field1);
+		lowestTempTime = new Date(data.created_at);
+		}
+	}
+
+	if(highestpressure!=null && lowestpressure!=null){
+	if (parseFloat(data.field2)>=highestpressure){
+		highestpressure=parseFloat(data.field2);
+		highestpressureTime = new Date(data.created_at);
+		}
+	if (parseFloat(data.field2)<=lowestpressure){
+		lowestpressure=parseFloat(data.field2);
+		lowestpressureTime = new Date(data.created_at);
+		}
+	}
+
+	if(highestWindSpeed!=null && lowestWindSpeed!=null){
+	if (parseFloat(data.field4)>=highestWindSpeed){
+		highestWindSpeed=parseFloat(data.field4);
+		highestWindSpeedTime = new Date(data.created_at);
+		}
+	if (parseFloat(data.field4)<=lowestWindSpeed){
+		lowestWindSpeed=parseFloat(data.field4);
+		lowestWindSpeedTime = new Date(data.created_at);
+		}
+	}
+
+	
+
+
+
+lastUpdtTime = (new Date()).getTime();
+	}).fail(function() { 
+		$("#entry_id").html("Error receiving data").css("fontSize", 15);
+		$("#entry_id").css('color', '#f44b4b');
+		});
+
+
+}
+
+function liveTimerUpdtFun() {
+	// drowser requst time past
+	if(lastUpdtTime!=null){
+	var timepass = ((new Date().getTime() - lastUpdtTime)/1000);
+	$("#UpdtIn").html("Browser request: " + Math.round(timepass)+ " Sec ago").css("fontSize", 15);
+	$("#UpdtIn").css('color', '#40ef8c');
+
+
+     // data freshness warning
+     var Freshness = (((new Date().getTime() + timeCorection)-d)/1000);
+	 if(alertDone==false && Freshness>4600){
+	 alert('Data received '+ Math.round(Freshness) + ' Sec ago. Data is old, something wrong, try reloading the page');
+	 alertDone=true;
+	 }
+	 // data freshness info
+	 if(Freshness<=timepass){
+	 $("#IsDataFresh").html("Measured: about 1 min ago").css("fontSize", 15);
+	 }else{
+     $("#IsDataFresh").html("Measured: " + Math.round(Freshness) + " Sec ago").css("fontSize", 15);
+	 }
+	 $("#IsDataFresh").css('color', '#40b7ef');
+	
+	}
+
+	// smart schedule update, to get freshest data
+	if(Freshness>61.0 && Freshness<61.999){
+	console.log("Smart scheduled requst: ok");
+	clearInterval(refreshIntervalId);
+	refreshIntervalId = setInterval('getUpdates()',15000);
+	getUpdates();
+	}
+
+
+	// highLow
+	if(lowestTemp != null && highestTemp!=null){
+	$("#highestTemp").html(highestTemp).css("fontSize", 16);
+	$("#lowestTemp").html(lowestTemp).css("fontSize", 16);
+
+	$("#highestTemp").css('color', '#40ef8c');
+	$("#lowestTemp").css('color', '#40ef8c');
+	$("#highestTemp").css("fontSize", 22);
+	$("#lowestTemp").css("fontSize", 22);
+	
+	
+	
+
+	$("#highestTempTime").html(highestTempTime.toLocaleString("en-GB", options)).css("fontSize", 16);
+	$("#lowestTempTime").html(lowestTempTime.toLocaleString("en-GB", options)).css("fontSize", 16);
+
+	// time now report
+		if(timeCorection!=0)
+		{
+
+			var optionsTime = { 
+			hour: 'numeric',
+			minute: 'numeric',
+		    second: 'numeric'
+		   };
+
+			var realTimeDate = new Date();
+			realTimeDate.setSeconds(realTimeDate.getSeconds() + timeCorection/1000);
+			var timeMsg ='';
+
+			// how bad the error? worth showing?
+			if(timeCorection>800 || timeCorection<-800)
+            {
+					if(timeCorection>0)
+					{
+					timeMsg = " | Your watch is: " + (timeCorection/1000).toFixed(1) + " sec behind"; 
+					}
+					else
+					{
+					timeMsg = " | Your watch is: " + (timeCorection/1000).toFixed(1).substr(1) + " sec ahead."; 
+					}
+					
+			}
+
+			$("#clockInfo").html("Now: " + realTimeDate.toLocaleString("en-GB", optionsTime) + timeMsg + "<hr>").css("fontSize", 15);
+			$("#clockInfo").attr('title', 'Using time zone of your device.');
+		}
+
+	}
+
+	if(lowestpressure != null && highestpressure!=null){
+	$("#highestpressure").html(highestpressure).css("fontSize", 16);
+	$("#lowestpressure").html(lowestpressure).css("fontSize", 16);
+
+	$("#highestpressure").css('color', '#40ef8c');
+	$("#lowestpressure").css('color', '#40ef8c');
+	$("#highestpressure").css("fontSize", 22);
+	$("#lowestpressure").css("fontSize", 22);
+	
+	
+	
+
+	$("#highestpressureTime").html(highestpressureTime.toLocaleString("en-GB", options)).css("fontSize", 16);
+	$("#lowestpressureTime").html(lowestpressureTime.toLocaleString("en-GB", options)).css("fontSize", 16);
+
+	// time now report
+		if(timeCorection!=0)
+		{
+
+			var optionsTime = { 
+			hour: 'numeric',
+			minute: 'numeric',
+		    second: 'numeric'
+		   };
+
+			var realTimeDate = new Date();
+			realTimeDate.setSeconds(realTimeDate.getSeconds() + timeCorection/1000);
+			var timeMsg ='';
+
+			// how bad the error? worth showing?
+			if(timeCorection>800 || timeCorection<-800)
+            {
+					if(timeCorection>0)
+					{
+					timeMsg = " | Your watch is: " + (timeCorection/1000).toFixed(1) + " sec behind"; 
+					}
+					else
+					{
+					timeMsg = " | Your watch is: " + (timeCorection/1000).toFixed(1).substr(1) + " sec ahead."; 
+					}
+					
+			}
+
+			$("#clockInfo").html("Now: " + realTimeDate.toLocaleString("en-GB", optionsTime) + timeMsg + "<hr>").css("fontSize", 15);
+			$("#clockInfo").attr('title', 'Using time zone of your device.');
+		}
+
+	}
+
+	if(lowestWindSpeed != null && highestWindSpeed!=null){
+	$("#highestWindSpeed").html(highestWindSpeed).css("fontSize", 16);
+	$("#lowestWindSpeed").html(lowestWindSpeed).css("fontSize", 16);
+
+	$("#highestWindSpeed").css('color', '#40ef8c');
+	$("#lowestWindSpeed").css('color', '#40ef8c');
+	$("#highestWindSpeed").css("fontSize", 22);
+	$("#lowestWindSpeed").css("fontSize", 22);
+	
+	
+	
+
+	$("#highestWindSpeedTime").html(highestWindSpeedTime.toLocaleString("en-GB", options)).css("fontSize", 16);
+	$("#lowestWindSpeedTime").html(lowestWindSpeedTime.toLocaleString("en-GB", options)).css("fontSize", 16);
+
+	// time now report
+		if(timeCorection!=0)
+		{
+
+			var optionsTime = { 
+			hour: 'numeric',
+			minute: 'numeric',
+		    second: 'numeric'
+		   };
+
+			var realTimeDate = new Date();
+			realTimeDate.setSeconds(realTimeDate.getSeconds() + timeCorection/1000);
+			var timeMsg ='';
+
+			// how bad the error? worth showing?
+			if(timeCorection>800 || timeCorection<-800)
+            {
+					if(timeCorection>0)
+					{
+					timeMsg = " | Your watch is: " + (timeCorection/1000).toFixed(1) + " sec behind"; 
+					}
+					else
+					{
+					timeMsg = " | Your watch is: " + (timeCorection/1000).toFixed(1).substr(1) + " sec ahead."; 
+					}
+					
+			}
+
+			$("#clockInfo").html("Now: " + realTimeDate.toLocaleString("en-GB", optionsTime) + timeMsg + "<hr>").css("fontSize", 15);
+			$("#clockInfo").attr('title', 'Using time zone of your device.');
+		}
+
+	}
+}
+</script>
+
+
+  <style>
+
+a {
+  color: #40ef8c;
+}
+
+.background-image {
+  /* background-image: url('https://dl.dropboxusercontent.com/s/617diqol9mnutmm/backWeatherDark.jpg'); */
+  min-height: 120%;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  background-size: cover;
+  filter: blur(10px);
+  -webkit-filter: blur(10px);
+  transform: scale(1.1);
+  height: 120%;
+  left: 0;
+  position: fixed;
+  right: 0;
+  z-index: 1;
+}
+
+
+.wrap {
+	
+  float: left;
+  box-sizing: border-box; /* added (width includes padding and border) */
+  padding-right: 15px;
+
+
+}
+
+.content {
+	float: left;
+	background: rgba(0, 0, 0, 0.664);
+	height: 955px;
+
+	overflow: auto;
+	
+  border-radius: 12px;
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.733);
+  font-family: Helvetica Neue, Helvetica, Arial, sans-serif;
+  top: 10px;
+  
+  position: relative;
+  margin-top: 5px;
+  margin-bottom: 15px;
+  margin-left: 10px;
+  margin-right: 5px;
+  
+  z-index: 2;
+  padding: 0 10px;
+ 
+}
+
+
+	  li{
+		margin-left: 2px;
+		margin-top: 5px;
+       margin-bottom: 0px;
+    
+	  }
+
+	  #MyTitle{
+
+		
+		width: 410px;
+
+		  margin-top: 10px;
+          margin-bottom: -15px;
+
+		text-align: center
+		
+		
+	  }
+	  
+
+
+  #dataLive{
+   
+    width: 410px;
+    margin: 5px;
+	outline: none;
+
+	display: inline-block;
+
+	padding: 5px;
+	
+	
+	
+}
+
+    hr {
+      display: block;
+      height: 1px;
+      border: 0;
+      border-top: 3px solid #AC0239;
+
+      padding: 0;
+    }
+    
+    .MyButton {
+	background-color:#004c5f77;
+	-moz-border-radius:28px;
+	-webkit-border-radius:28px;
+	border-radius:28px;
+	border:1px solid #2282be8c;
+	display:inline-block;
+	cursor:pointer;
+	color:#ffffff;
+	font-family:Arial;
+	font-size:15px;
+	
+	text-decoration:none;
+
+    float: left;
+    clear: left;
+    width: 410px;
+  
+	margin-bottom: 10px;
+	outline: none;
+	padding: 5;
+
+}
+.MyButton:hover {
+	background-color:#014b7cb2;
+}
+.MyButton:active {
+	position:relative;
+	top:1px;
+}
+  </style>  
+<BODY>
+
+
+
+  <div class="background-image"></div>
+  <div class="wrap">
+  <span class="content" >
+  
+  
+     
+  
+
+  
+   
+	 <div id="dataLive">
+
+	  <h1 id="MyTitle" align="center">Environmental Monitoring System</h1>
+	  <h3  align="center">Edo State University  <a href="https://en.wikipedia.org/wiki/Iyamho" align="left">Iyamho'</a></h3>
+      <hr>
+
+	  <li> Temperature now: <span id="field1" > -- </span> °C </li>
+	  <li> Atmospheric pressure: <span id="field2" > --- </span> mmHg </li>
+	  <li> WindSpeed now: <span id="field3" > -- </span> M/s </li>
+	  <li> WindSpeed now: <span id="field4" > --- </span> Km/h </li>
+	  <li> It was measured: <span id="created_at" > --- </span> </li>
+	  <li> Measurement number Count # <span id="entry_id" > Getting data, wait! </span> </li>
+
+	  <div id="highLowConteiner">
+			<hr>
+			<li> Highest temperature in 24 hours: <span id="highestTemp"> -- </span> °C </li>
+			<li> Highest detected: <span id="highestTempTime"> -- </span></li>
+			<p></p>
+			<li> Lowest temperature in 24 hours: <span id="lowestTemp"> -- </span> °C </li>
+			<li> Lowest detected: <span id="lowestTempTime"> -- </span></li>
+			<p></p>
+			<li> Highest pressure in 24 hours: <span id="highestpressure"> -- </span> mmHg </li>
+			<li> Highest detected: <span id="highestpressureTime"> -- </span></li>
+			<p></p>
+			<li> Lowest pressure in 24 hours: <span id="lowestpressure"> -- </span> mmHg </li>
+			<li> Lowest detected: <span id="lowestpressureTime"> -- </span></li>
+			<p></p>
+			<li> Highest WindSpeed in 24 hours: <span id="highestWindSpeed"> -- </span> Km/h </li>
+			<li> Highest detected: <span id="highestWindSpeedTime"> -- </span></li>
+			<p></p>
+			<li> Lowest WindSpeed in 24 hours: <span id="lowestWindSpeed"> -- </span> Km/h </li>
+			<li> Lowest detected: <span id="lowestWindSpeedTime"> -- </span></li>
+	 </div>
+
+	  <p><button class="MyButton" onclick="location.href='https://electrical-pro.github.io/epro/pressuree_and_temp.html'"> >> Analysis Chart << </a></button></p>
+	  <hr>
+	  
+
+       <div id="IsDataFresh" align="left"> </div>
+       <div id="UpdtIn" align="left"> </div>
+       <div  align="left">* Automatically updates every 15 Seconds </div>
+	   <hr>
+	   <div id="sunInfo"></div>
+	   <div id="clockInfo"></div>
+
+	   <p>(C) <a href="https://www.edouniversity.edu.ng/" align="left">Edo State University Iyamho</a> | 2025</p>
+
+	 </div>
+
+</div>
+
+</BODY>
+
+</html>
+
